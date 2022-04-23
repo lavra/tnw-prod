@@ -1,0 +1,93 @@
+version: "3.7"
+
+services:
+    # image project
+    tnwjeans_do:
+        build:
+            args:
+                user: avdesign
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile
+        image: tnw-app
+        restart: unless-stopped
+        working_dir: /var/www/
+        volumes:
+            - ./:/var/www
+        depends_on: 
+            - redis
+            - queue
+        networks: 
+            - tnw-network
+
+    # nginx
+    nginx:
+        image: nginx:alpine
+        restart: unless-stopped
+        ports: 
+            - "80:80"
+        volumes: 
+            - ./:/var/www
+            - ./docker/nginx/:/etc/nginx/conf.d/
+        networks: 
+             - tnw-network
+
+
+    # db mysql
+    mysql:
+        image: mysql:5.7.22
+        restart: unless-stopped
+        environment: 
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+        volumes: 
+            - ./.docker/mysql/dbdata:/var/lib/mysql
+        networks: 
+            - tnw-network    
+
+
+    # phpmyadmin
+    phpmyadmin:
+        container_name: tnw-phpmyadmin
+        image: phpmyadmin/phpmyadmin:latest
+        environment:
+            PMA_HOST: mysql
+            PMA_PORT: 3306
+            PMA_ARBITRARY: 1
+        ports:
+            - "81:80"
+        networks:
+            - tnw-network
+        depends_on:
+            - mysql
+
+
+    # queue
+    queue:
+        build: 
+            args:
+                user: avdesign
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        command: "php artisan queue:work"
+        volumes: 
+            - ./:/var/www
+        depends_on: 
+            - redis
+        networks: 
+            - tnw-network
+
+
+     # redis
+    redis:
+        image: redis:latest
+        networks: 
+            - tnw-network
+
+networks:
+    tnw-network:
+        driver: bridge
